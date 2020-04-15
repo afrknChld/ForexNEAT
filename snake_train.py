@@ -2,7 +2,7 @@ import neat
 import pickle
 import sys
 import time
-from snakeRunner import snakeRunner
+from snakeRunner import snakeRunner, snakeNN
 
 print(neat.__file__);
 
@@ -20,12 +20,13 @@ def readFromGenFile():
         "gen": int(genFile.readline()),
         "savefile": genFile.readline(),
         "loadfile": genFile.readline(),
-        "curID": int(genFile.readline())
+        "curID": int(genFile.readline()),
+        "winnerID": int(genFile.readline())
     };
     genFile.close()
     return toReturn;
 
-def writeToGenFile(s,savefile,l,loadfile,gen,curID):
+def writeToGenFile(s,savefile,l,loadfile,gen,curID,winnerID = 0):
     if(savefile == ""):
         savefile = "None\n"
     elif(savefile[-1] != '\n'):
@@ -37,7 +38,7 @@ def writeToGenFile(s,savefile,l,loadfile,gen,curID):
     genFile = open("gen.txt","w")
     genFile.truncate()
     genFile.write(str(s) + "\n" + str(l) + "\n" + str(gen) + "\n");
-    genFile.write(str(savefile) + str(loadfile) + str(curID) + "\n")
+    genFile.write(str(savefile) + str(loadfile) + str(curID) + "\n" + str(winnerID));
     genFile.close()
 
 
@@ -79,8 +80,11 @@ def evolutionary_driver(n=0,load = False, loadfile = "", save = False, savefile 
 
     winner = p.run(eval_genomes, n=n)
 
+    winnerID = readFromGenFile()["winnerID"];
+
+    winnerSnake = snakeNN(winner, config, winnerID);
     # dump
-    pickle.dump(winner, open('winner.pkl', 'wb'))
+    pickle.dump(winnerSnake, open('winner.pkl', 'wb'))
 
     if save:
         genFileResults = readFromGenFile()
@@ -99,7 +103,6 @@ def eval_genomes(genomes, config):
     loadfile = genFileResults["loadfile"];
     curID = genFileResults["curID"];
 
-    # Play game and get results
     idx,genomes = zip(*genomes)
 
     runner = snakeRunner(genomes, config, gen, curID);
@@ -116,17 +119,18 @@ def eval_genomes(genomes, config):
         id = result["id"];
         genomes.fitness = fitness
 
-        print("fitness for NN of id "+ str(id) +" is: " + str(fitness));
+        #print("fitness for NN of id "+ str(id) +" is: " + str(fitness));
 
         if fitness > top_fitness:
             top_fitness = fitness
+            winnerID = id
 
         curID = id
 
     print("The top fitness for this generation is: " + str(top_fitness))
 
     gen+=1
-    writeToGenFile(s, savefile, l, loadfile, gen, curID);
+    writeToGenFile(s, savefile, l, loadfile, gen, curID,winnerID);
 
 
 
