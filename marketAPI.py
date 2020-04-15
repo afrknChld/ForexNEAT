@@ -114,6 +114,14 @@ def initMarketData():
     #gets market data from the oandapy api and initializes the
     #trainingMarketAPI object with the date
 
+    #fix dhkey too small error on google cloud with ssl cyphers
+    requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS += "HIGH:!DH:!aNULL:!kRSA:!MD5:!RC4"
+    try:
+        requests.packages.urllib3.contrib.pyopenssl.DEFAULT_SSL_CIPHER_LIST += "HIGH:!aNULL:!kRSA:!MD5:!RC4"
+    except AttributeError:
+        # no pyopenssl support used / needed / available
+        pass
+
     print("initializing marketData");
     genData = marketData(); #initializes object that gets data for a generation
     trainingMarketAPI.initMarketData(genData); #gives the market data to
@@ -179,16 +187,6 @@ class marketData(object):
             "count": 5000,
         }
         marketData = [];
-
-        #fix dhkey too small error on google cloud with ssl cyphers
-        requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS += "HIGH:!aNULL:!kRSA:!MD5:!RC4"
-        try:
-            requests.packages.urllib3.contrib.pyopenssl.DEFAULT_SSL_CIPHER_LIST += "HIGH:!aNULL:!kRSA:!MD5:!RC4"
-        except AttributeError:
-            # no pyopenssl support used / needed / available
-            pass
-
-
         for r in InstrumentsCandlesFactory(instrument=instrument,params=params):
             rv = client.request(r);
             marketData.extend(rv["candles"]);
@@ -205,7 +203,6 @@ class marketData(object):
                 "includeFirst": True,
                 "count": 5000,
             }
-
             for r in InstrumentsCandlesFactory(instrument=instrument,params=params):
                 rv = client.request(r);
                 newCandles.extend(rv["candles"])
