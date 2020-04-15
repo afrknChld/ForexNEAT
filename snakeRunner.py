@@ -102,7 +102,7 @@ class snakeRunner(object):
 
     def run(self,save):
         initMarketData();
-        pool = Pool(processes = int(len(self.snakes)/4),maxtasksperchild = 1);
+        pool = Pool(processes = int(len(self.snakes)/4));
         for snake in self.snakes:
             self.threads.append(pool.apply_async(snake.test))
         pool.close();

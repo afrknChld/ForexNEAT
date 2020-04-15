@@ -210,9 +210,7 @@ class marketData(object):
             print("newEndDate: " + endTimeString)
             daysToAdd = 7 - (self.dayInterval%7)
             toMinus = 2 + daysToAdd
-            print(newCandles)
             for i in range(daysToAdd):
-                print(toMinus)
                 toAdd.append(newCandles[len(newCandles)-toMinus])
                 toMinus -= 1
 
@@ -250,7 +248,6 @@ class marketData(object):
         if int(date) < 10:
             date = "0" + date
         newDateString = dateString[:5] + str(date) + dateString[7:]
-        print(newDateString)
         return newDateString
 
 
