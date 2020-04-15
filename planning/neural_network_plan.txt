@@ -1,0 +1,40 @@
+Neural network inputs
+-Current Market open price
+-Current Market close price
+-Pip Difference between last period
+-Last Pip difference
+-Number of open positions
+-Current Monthly/Weekly/Daily low price
+-Current Monthly/Weekly/Daily high price
+-Current Balance
+-Current Equity
+
+Neural Network Outputs
+-Open Position
+-Close Position
+
+Training will be run on a cloud computing service
+	AWS or Google or both
+
+long training and short training
+
+Test network for equal periods of time
+
+multithreading
+
+Fitness:
+Ending Balance/Equity - Starting Balance/Equity
+
+any network that passes certain fitness requirements will be sent to a separate server/computer/computational entity to undergo extensive testing to see if the network can make money in all situations 
+	Testing will consist of 1000 tests similar to the training tests with
+	varying, random market conditions
+	The computer will compute a percentage of a positive fitness score out
+	of the 1000 tests and this information will be emailed to me along
+	with other information such as the average profit, etc
+		The email will be a daily or some period of time compiled
+		progress report of everything of note that has occured 
+
+Implementation
+NEAT Python
+Oanda API or a Spotware API or the most useful forex API
+AWS/ Google Developer tools for cloud computation 

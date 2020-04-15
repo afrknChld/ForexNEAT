@@ -1,0 +1,16 @@
+Checklist:
+training factory
+	NN training code
+	Analytics
+		Recognizing high performing NNs and sending them to testing
+		factory
+server for communications between factories
+	getting NNs from training factory and sending them to testing factory
+	SQL database of tested NNs
+	Email me with updates
+	Second SQL database of NNs that could not be stored in primary database 
+testing factory
+	getting NNs 
+	testing each NN 1000 times
+	analyzing data
+	updating database and creating email progress report
