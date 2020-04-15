@@ -253,13 +253,11 @@ class marketData(object):
 
 def getStdDev(dataset, mean):
     total = 0;
-    print(len(dataset))
     for point in dataset:
         total += (float(point) - mean) ** 2;
     if(total == 0):
         total = 1
     stdmean = total / (len(dataset));
-    print("stddev: " + str(math.sqrt(stdmean)));
     return math.sqrt(stdmean);
 
 def getMean(dataset):
@@ -425,8 +423,6 @@ class trainingMarketAPI(object):
         last = (0,0)
         counter = 0
         mcounter = 0
-        print(len(values))
-        print(len(values)/12)
         for index in range(len(values)):
             if index == 0:
                 pdm = 0
@@ -456,15 +452,10 @@ class trainingMarketAPI(object):
                 mcounter+=1
             else:
                 counter += 1
-        print("mcounter: " + str(mcounter))
         return (pdmarray,ndmarray)
 
     def getDI(dm, atr, window):
         pdm,ndm = dm
-        print("PDMLEN: " + str(len(pdm)))
-        print("NDMLEN: " + str(len(ndm)))
-        print("ATRLEN: " + str(len(atr)))
-        print(str(len(atr)/12))
         pdmEMA = trainingMarketAPI.ExpMovingAverage(pdm,int(window/12))
         ndmEMA = trainingMarketAPI.ExpMovingAverage(ndm,int(window/12))
         pdiArray = []
