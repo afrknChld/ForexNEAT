@@ -3,17 +3,17 @@
 # The `NEAT` section specifies parameters particular to the NEAT algorithm
 # or the experiment itself.  This is the only required section.
 [NEAT]
-fitness_criterion      = max
+fitness_criterion      = mean
 fitness_threshold      = 1000000
-no_fitness_termination = True
+no_fitness_termination = False
 pop_size               = 1000
-reset_on_extinction    = 0
+reset_on_extinction    = True
 
 [DefaultGenome]
 # node activation options
-activation_default      = selu
+activation_default      = tanh
 activation_mutate_rate  = 0.025
-activation_options      = tanh relu sigmoid selu lrelu elu
+activation_options      = tanh sigmoid selu lrelu elu abs cube square relu
 #maybe consider adding more options
 
 # node aggregation options
@@ -43,15 +43,15 @@ enabled_default         = True
 enabled_mutate_rate     = 0.05
 
 feed_forward            = True
-initial_connection      = partial_direct .1
+initial_connection      = partial_direct .2
 
 # node add/remove rates
 node_add_prob           = 0.2
 node_delete_prob        = 0.2
 
 # network parameters
-num_hidden              = 1
-num_inputs              = 19
+num_hidden              = 2
+num_inputs              = 35
 num_outputs             = 2
 
 # node response options
@@ -81,5 +81,5 @@ max_stagnation       = 15
 species_elitism      = 1
 
 [DefaultReproduction]
-elitism            = 2
+elitism            = 1
 survival_threshold = 0.2

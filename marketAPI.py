@@ -63,7 +63,9 @@ import pickle
 import calendar
 import math
 import numpy as np
+import pandas
 import quandl
+from dbnomics import fetch_series, fetch_series_by_api_link
 import oandapyV20
 import oandapyV20.endpoints.instruments as instruments
 from oandapyV20.contrib.factories import InstrumentsCandlesFactory
@@ -133,6 +135,7 @@ def debug(vars,pause = True):
     if pause:
         input("Press Enter to continue...");
 
+
 class marketData(object):
     #gets market data from oanda api
     granularity = {
@@ -150,6 +153,7 @@ class marketData(object):
         self.date = getRandomDate(self.dayInterval); #gets date for
         self.marketData = self.getAllMarketData();
         self.weekExtremes = self.calculateExtremes(self.marketData["dailyData"])
+        self.fundamentalData = self.getFundamentalAnalysisData()
 
     def calculateExtremes(self, dataSet):
         high = float(dataSet[0]["mid"]["h"])
@@ -162,15 +166,40 @@ class marketData(object):
             if curLow < low:
                 low = curLow
         return (high, low)
-    @staticmethod
-    def getFundamentalAnalysisData():
-        startDate, endDate = getRandomDate(4)
-        startDate = startDate[:10]
-        endDate = endDate[:10]
+
+    def getFundamentalAnalysisData(self):
+        endDate, idx = self.date
+        startDate = marketData.parseMonthsBack(endDate, self.dayInterval);
         quandl.ApiConfig.api_key = "kkPxNpCyfyzE6SyadrVc"
-        usaInflationData = quandl.get("ODA/USA_PCPIPCH",start_date = startDate, collapse = "daily")
-        gbrInflationData = quandl.get("ODA/GBR_PCPIPCH", start_date = startDate, collapse = "daily");
-        return (usaInflationData, gbrInflationData)
+        usaExports = quandl.get("FRED/IEAXGSN",start_date = startDate[:10], end_date = endDate[:10], returns = "numpy")
+        usaGDP = quandl.get("FRED/NGDPPOT", start_date = startDate[:10], end_date = endDate[:10], returns = "numpy");
+        usaExports = usaExports[-1][-1]
+        usaGDP = usaGDP[-1][-1]
+        usaGDP = usaGDP * 1000
+
+        fullEurData = pickle.load(open('euroFundamentalData.pkl','rb'))
+        queryString = "period > '" + startDate[:10] + "' and period <= '" + endDate[:10] +"'"
+        for data in fullEurData:
+            data.query(queryString, inplace = True)
+        ukGDP = fullEurData[0]["value"].iat[-1]
+        ukExports = fullEurData[1]["value"].iat[-1]
+        franceGDP = fullEurData[2]["value"].iat[-1]
+        franceExports = fullEurData[3]["value"].iat[-1]
+
+        eurExports = ukExports + franceExports
+        eurGDP = ukGDP + franceGDP
+
+        eurData = {
+            "exports": eurExports,
+            "gdp": eurGDP
+        }
+
+        usaData = {
+            "exports": usaExports,
+            "gdp": usaGDP
+        }
+
+        return usaData, eurData
 
 
     def getMarketData(self, granularity):
@@ -295,10 +324,15 @@ class trainingMarketAPI(object):
     def initMarketData(cls,marketDataObject):
         cls.secondStart = (cls.EMAWindow * 2) - 1
         cls.marketData = marketDataObject.marketData;
-        cls.weekExtremes = marketDataObject.weekExtremes
+        cls.weekExtremesInit = marketDataObject.weekExtremes
+        cls.fundamentalData = marketDataObject.fundamentalData
+        cls.supportandResistanceInit = cls.calculateSupportandResistance()
+        print("SR: " + str(cls.supportandResistanceInit))
+        cls.SRTouchesInit = (0,(0,0,0),(0,0,0))
+        cls.SRStrengthsInit = (0,(0,0,0),(0,0,0))
         print("dataset_length: " + str(len(marketDataObject.marketData["secondData"])))
         secondDataArray = cls.getSecondDataArray()
-        cls.dayExtremes = cls.initDailyExtremes(secondDataArray, cls.secondStart)
+        cls.dayExtremesInit = cls.initDailyExtremes(secondDataArray, cls.secondStart)
         cls.emaData = trainingMarketAPI.ExpMovingAverage(secondDataArray, cls.EMAWindow);
         cls.macdData = trainingMarketAPI.getMACD(secondDataArray, cls.emaData,cls.EMAWindow)
         hl, cls.atrData = trainingMarketAPI.getATR(secondDataArray, cls.EMAWindow)
@@ -309,6 +343,56 @@ class trainingMarketAPI(object):
         for point in cls.marketData["dailyData"]:
             print(point)
         print()
+
+    @classmethod
+    def initSRTouches(cls,price):
+        SR = cls.supportandResistanceInit
+        PP, S, R = SR
+        touches = [0,0,0,0,0,0,0]
+        S1, S2, S3 = S
+        R1, R2, R3 = R
+        all = (S1,S2,S3,R1,R2,R3,PP)
+        for index, point in enumerate(all):
+            if price == point:
+                touches[index] += 1
+        TS1,TS2,TS3,TR1,TR2,TR3,TP = trainingMarketAPI.listToTuple(touches)
+        cls.SRTouchesInit = (TP, (TS1,TS2,TS3), (TR1,TR2,TR3))
+
+    @classmethod
+    def calculateSupportandResistance(cls, close = 0, high = 0, low = 0):
+        if close == 0:
+            day = cls.marketData["dailyData"][-1]
+            print("day: " + str(day))
+            high = float(day["mid"]["h"])
+            low = float(day["mid"]["l"])
+            close = float(day["mid"]["c"])
+        else:
+            high = high
+            low = low
+            close = close
+
+        PP = (high + low + close) / 3
+        R1 = (2*PP) - low
+        S1 = (2*PP) - high
+        R2 = PP + (high-low)
+        S2 = PP - (high-low)
+        R3 = high + (2 * (PP - low))
+        S3 = low - (2 * (high - PP))
+
+        return (PP,(S1,S2,S3),(R1,R2,R3))
+
+    @classmethod
+    def initDailyExtremes(cls,dataset,limit):
+        high = dataset[0]
+        low = dataset[0]
+        for index in range(limit):
+            cls.initSRTouches(dataset[index])
+            if dataset[index] > high:
+                high = dataset[index]
+            if dataset[index] < low:
+                low = dataset[index]
+
+        return (high, low)
 
     def normalizePrice(self, price):
         curEMA = self.emaData[self.counters["second"]];
@@ -335,6 +419,8 @@ class trainingMarketAPI(object):
             toReturn = self.normalizeInverseLogit(value)
         elif type == "0toinf":
             toReturn = self.normalizeInverseLogitAfterLog(value)
+        elif type == "fundamentals":
+            toReturn = value / 1000000
         elif type == "none":
             toReturn = value
         else:
@@ -349,7 +435,7 @@ class trainingMarketAPI(object):
 
     @staticmethod
     def normalizeInverseLogit(value):
-        return 1/(1+math.exp(-value))
+        return 1/(1+np.exp(-value))
 
     @staticmethod
     def standardizeBounds(val,min,max):
@@ -360,18 +446,6 @@ class trainingMarketAPI(object):
     def normalizeDifference(toNormalize):
         return toNormalize * 10000;
 
-
-    @staticmethod
-    def initDailyExtremes(dataset,limit):
-        high = dataset[0]
-        low = dataset[0]
-        for index in range(limit):
-            if dataset[index] > high:
-                high = dataset[index]
-            if dataset[index] < low:
-                low = dataset[index]
-
-        return (high, low)
 
     @staticmethod
     def movingAverage(values,window):
@@ -572,8 +646,9 @@ class trainingMarketAPI(object):
             highandlow.append(toAddHL)
         return (highandlow,toReturn)
 
-
-
+    @staticmethod
+    def listToTuple(list):
+        return(l for l in list)
 
     def __init__(self):
         self.failed = False;
@@ -581,6 +656,12 @@ class trainingMarketAPI(object):
         self.started = False;
         self.positions = [];
         self.lastAction = 2;
+        self.dayCounter = self.secondStart
+        self.weekExtremes = self.weekExtremesInit
+        self.dayExtremes = self.dayExtremesInit
+        self.supportandResistance = self.supportandResistanceInit
+        self.SRStrengths = self.SRStrengthsInit
+        self.SRTouches = self.SRTouchesInit
         self.counters = {
             "second": self.secondStart,
             "monthly": 0,
@@ -609,6 +690,38 @@ class trainingMarketAPI(object):
         for pos in debugPosData:
             print("\t" + str(pos))
 
+    def calculateSRTouches(self,price):
+        SR = self.supportandResistance
+        TP, TS, TR = self.SRTouches
+        TS1, TS2, TS3 = TS
+        TR1, TR2, TR3 = TR
+        touches = [TP, TS1, TS2, TS3, TR1, TR2, TR3]
+        PP, S, R = SR
+        S1, S2, S3 = S
+        R1, R2, R3 = R
+        all = (PP,S1,S2,S3,R1,R2,R3)
+        for index, point in enumerate(all):
+            if price == point:
+                touches[index] += 1
+        TP,TS1,TS2,TS3,TR1,TR2,TR3 = trainingMarketAPI.listToTuple(touches)
+        return (TP, (TS1,TS2,TS3), (TR1,TR2,TR3))
+
+    def calculateSRStrenths(self, price, dayCounter):
+        self.SRTouches = self.calculateSRTouches(price)
+        TP, TS, TR = self.SRTouches
+        TS1, TS2, TS3 = TS
+        TR1, TR2, TR3 = TR
+        strengths = [0,0,0,0,0,0,0]
+        touches = [TP, TS1, TS2, TS3, TR1, TR2, TR3]
+        for index, point in enumerate(touches):
+            strength = ((17280/2) - dayCounter - point * 30) / (17280/2)
+            if strength > 1:
+                strength = 1
+            elif strength < -1:
+                strength = -1
+            strengths[index] = strength
+        SP, SS1, SS2, SS3, SR1, SR2, SR3 = trainingMarketAPI.listToTuple(strengths)
+        self.SRStrengths = (SP, (SS1,SS2,SS3), (SR1, SR2, SR3))
 
     def calculateExtremes(self, price):
         weeklyHigh, weeklyLow = self.weekExtremes
@@ -624,10 +737,29 @@ class trainingMarketAPI(object):
         if dailyLow < weeklyLow:
             weeklyLow = dailyLow
 
+        self.calculateSRStrenths(price, self.dayCounter)
+        if self.dayCounter == 17280:
+            self.supportandResistance = self.calculateSupportandResistance(
+                    close = price, high = dailyHigh, low = dailyLow)
+            self.dayCounter = 0
+            dailyHigh = price
+            dailyLow = price
+        self.dayCounter+=1
+
         self.weekExtremes = (weeklyHigh, weeklyLow)
         self.dayExtremes = (dailyHigh, dailyLow)
 
         return (self.dayExtremes, self.weekExtremes)
+
+    def calculateFundamentals(self, price):
+        usaData, eurData = self.fundamentalData
+        usaGDP = usaData["gdp"]
+        usaExports = usaData["exports"]
+        eurGDP = eurData["gdp"] * price
+        eurExports = eurData["exports"] * price
+        gdpDif = usaGDP - eurGDP
+        exportsDif = usaExports - eurExports
+        return (gdpDif, exportsDif)
 
 
     def getInputData(self):
@@ -665,6 +797,31 @@ class trainingMarketAPI(object):
         MACD = self.macdData[secondCounter]
         inputData.append(self.normalize(MACD))
 
+        PP, supports, resistances = self.supportandResistance
+        SP, SS, SR = self.SRStrengths
+        inputData.append(self.normalize(PP, "price"))
+        inputData.append(self.normalize(SP, "none"))
+        S1,S2,S3 = supports
+        SS1, SS2, SS3 = SS
+        inputData.append(self.normalize(S1, "price"))
+        inputData.append(self.normalize(SS1, "none"))
+        inputData.append(self.normalize(S2, "price"))
+        inputData.append(self.normalize(SS2, "none"))
+        inputData.append(self.normalize(S3, "price"))
+        inputData.append(self.normalize(SS3, "none"))
+        R1, R2, R3 = resistances
+        SR1, SR2, SR3 = SR
+        inputData.append(self.normalize(R1, "price"))
+        inputData.append(self.normalize(SR1, "none"))
+        inputData.append(self.normalize(R2, "price"))
+        inputData.append(self.normalize(SR2, "none"))
+        inputData.append(self.normalize(R3, "price"))
+        inputData.append(self.normalize(SR3, "none"))
+
+
+        gdp, exports = self.calculateFundamentals(secondOpen)
+        inputData.append(self.normalize(gdp, "fundamentals"))
+        inputData.append(self.normalize(exports, "fundamentals"))
 
         lastOpen = float(self.marketData["secondData"][secondCounter-1]["o"]);
         if self.counters["second"] == 0:
@@ -700,8 +857,11 @@ class trainingMarketAPI(object):
             "pdi": self.pdiData[self.counters["second"]-1],
             "ndi": self.ndiData[self.counters["second"]-1],
             "adx": self.adxData[self.counters["second"]-1],
-            "macd": self.macdData[self.counters["second"]-1]
-        },False)""";
+            "macd": self.macdData[self.counters["second"]-1],
+            "SR": self.supportandResistance,
+            "SR Strengths": self.SRStrengths,
+            "SR Touches": self.SRTouches
+        });"""
 
 
         if not (self.counters["second"] < len(self.marketData["secondData"])):
@@ -723,7 +883,7 @@ class trainingMarketAPI(object):
             self.equity -= p * self.posVolume;
             self.equity += curPrice * self.posVolume;
 
-        if(self.equity  < (self.balance -self.startingBalance)):
+        if(self.balance < 0 or (self.equity  < (self.balance -self.startingBalance))):
             print("Equity:" + str(self.equity) + "Balance: " + str(self.balance));
             self.failed = True;
             self.started = False;

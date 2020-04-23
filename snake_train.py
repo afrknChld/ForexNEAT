@@ -1,7 +1,14 @@
 import neat
 import pickle
 import sys
+import json
 import time
+import gzip
+import random
+import requests
+import paramiko
+from paramiko import SSHClient
+from scp import SCPClient
 from snakeRunner import snakeRunner, snakeNN
 
 print(neat.__file__);
@@ -11,6 +18,7 @@ class populationSave(object):
         self.population = population;
         self.gen = gen
         self.curID = curID
+        self.rndstate = random.getState()
 
 def readFromGenFile():
     genFile = open("gen.txt","r")
@@ -41,6 +49,24 @@ def writeToGenFile(s,savefile,l,loadfile,gen,curID,winnerID = 0):
     genFile.write(str(savefile) + str(loadfile) + str(curID) + "\n" + str(winnerID));
     genFile.close()
 
+def sendUpdateToServer(info):
+    dataString = json.dumps(info)
+    updateURL = "https://forexnntracker.herokuapp.com/trainingfactoryupdate"
+    data = {"info": dataString}
+    r = requests.post(updateURL, data = data)
+
+def sendToTestingFacility(info, filename):
+    url = "https://forexnntracker.herokuapp.com/trainingfactorysnakes"
+    pickle.dump(info, open(filename, "wb"))
+    files = {"file": open(filename,"rb")}
+    ssh = SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    key = paramiko.RSAKey.from_private_key_file("/home/cole/.ssh/id_rsa")
+    ssh.connect("ec2-3-16-37-109.us-east-2.compute.amazonaws.com", pkey = key, username = "ec2-user")
+    scp = SCPClient(ssh.get_transport())
+    scp.put(filename, remote_path = "/home/ec2-user/forexNEAT-testing-factory/toTestingFactory")
+    scp.close()
+
 
 # Driver for NEAT solution to FlapPyBird
 def evolutionary_driver(n=0,load = False, loadfile = "", save = False, savefile = ""):
@@ -55,9 +81,14 @@ def evolutionary_driver(n=0,load = False, loadfile = "", save = False, savefile 
         p = pSave.population;
         gen = pSave.gen
         curID = pSave.curID
+        random.setstate(pSave.rndstate)
     else:
         p = neat.Population(config)
         p.add_reporter(neat.StdOutReporter(False))
+        if save:
+            p.add_reporter(neat.Checkpointer(generation_interval = 5,
+                                        filename_prefix = savefile,
+                                        test_check = 0));
         gen = 0;
         curID = 0;
 
@@ -106,11 +137,15 @@ def eval_genomes(genomes, config):
     idx,genomes = zip(*genomes)
 
     runner = snakeRunner(genomes, config, gen, curID);
-    #runner.configure(False,True)
     runner.run(True)
     results = runner.getResults()
 
     top_fitness = 0
+    failed_count = 0
+    fitness_total = 0
+    runner_up_fitness = [0,0]
+    winners = [None,None,None]
+    positive_fitness_count = 0
     for result, genomes in results:
         fitness = result["fitness"];
         balance = result["balance"];
@@ -120,17 +155,64 @@ def eval_genomes(genomes, config):
         genomes.fitness = fitness
 
         #print("fitness for NN of id "+ str(id) +" is: " + str(fitness));
+        fitness_total += fitness
+
+        if fitness > 0:
+            positive_fitness_count += 1
 
         if fitness > top_fitness:
             top_fitness = fitness
             winnerID = id
+            if fitness > 0 :
+                winners[0] = {
+                    "id": id,
+                    "genome": genomes,
+                }
+        elif fitness > runner_up_fitness[0]:
+            runner_up_fitness[0] = fitness
+            if fitness > 0 :
+                winners[1] = {
+                    "id": id,
+                    "genome": genomes,
+                }
+        elif fitness > runner_up_fitness[1]:
+            runner_up_fitness[1] = fitness
+            if fitness > 0 :
+                winners[2] = {
+                    "id": id,
+                    "genome": genomes,
+                }
+
+
+        if failed:
+            failed_count+=1
 
         curID = id
 
+    average_fitness = fitness_total / len(results)
     print("The top fitness for this generation is: " + str(top_fitness))
 
     gen+=1
     writeToGenFile(s, savefile, l, loadfile, gen, curID,winnerID);
+
+    for winner in winners:
+        if winner == None:
+            winners.remove(winner)
+
+    sendToTestingFacility({
+        "config": config,
+        "winners": winners
+    }, "toTestingFacility" + str(gen) + ".pkl")
+
+    sendUpdateToServer({
+        "top_fitness": top_fitness,
+        "gen": gen-1,
+        "num_snakes_trained": curID,
+        "positive_fitness_count": positive_fitness_count,
+        "failed_count": failed_count,
+        "average_fitness": average_fitness,
+        "gen_size": len(results)
+    })
 
 
 

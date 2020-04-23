@@ -8,6 +8,7 @@ import threading
 import gc
 import psutil
 import os
+import numpy as np
 
 def getMemoryUsage():
     process = psutil.Process(os.getpid())
@@ -43,7 +44,13 @@ class snakeNN(object):
 
     def runNN(self,input):
         output = self.neural_network.activate(input)
-        return output.index(max(output))
+        output = [ (1/(1 + np.exp(-i))) for i in output ]
+        toReturn = 2
+        if output[0] > .5 and output[1] < .5:
+            toReturn = 0
+        elif output[1] > .5 and output[0] < .5:
+            toReturn = 1
+        return toReturn;
 
     def test(self):
         #runs the NN in a test environment for the purpose of evaluating
