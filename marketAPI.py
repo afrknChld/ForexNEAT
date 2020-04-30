@@ -88,13 +88,11 @@ def getDateAhead(year,month,day,hour,minute, dayInterval):
 
     if int(day) < 10:
         day = "0" + day
-    print("monthdays: " + str(monthDays))
     return(year, month, day, hour, minute)
 
 def getRandomDate(dayInterval):
     #returns a random date string formatted to rfc 3339 standard
     # as well as the date dayInterval days ahead
-    dayInterval = 4;
     random.seed(time.time());
     year = "20" + str(random.randrange(10,20,1));
     month = str(random.randrange(1,13,1));
@@ -106,10 +104,8 @@ def getRandomDate(dayInterval):
     hour = "21"
     minute = "00"
     dateString = year+"-"+month+"-"+day+"T"+hour+":"+minute+":00Z";
-    print("Day string: " + dateString)
     year, month, day, hour, minute = getDateAhead(year,month,day,hour,minute, dayInterval);
     nextDayString = year+"-"+month+"-"+day+"T"+hour+":"+minute+":00Z";
-    print("Next day string: " + nextDayString)
     return (dateString,nextDayString)
 
 def initMarketData():
@@ -146,7 +142,7 @@ class marketData(object):
     };
 
     def __init__(self):
-        self.dayInterval = 4 # the generation will run this many days
+        self.dayInterval = 5 # the generation will run this many days
         self.access_token = open("oanda_api_key.txt", "r").readline()[:-1];
         self.instrument = "EUR_USD";
         self.client = oandapyV20.API(access_token=self.access_token);
@@ -185,9 +181,21 @@ class marketData(object):
         ukExports = fullEurData[1]["value"].iat[-1]
         franceGDP = fullEurData[2]["value"].iat[-1]
         franceExports = fullEurData[3]["value"].iat[-1]
+        swedenGDP = fullEurData[4]["value"].iat[-1]
+        swedenExports = fullEurData[5]["value"].iat[-1]
+        greeceGDP = fullEurData[6]["value"].iat[-1]
+        greeceExports = fullEurData[7]["value"].iat[-1]
+        luxGDP = fullEurData[8]["value"].iat[-1]
+        luxExports = fullEurData[9]["value"].iat[-1]
+        spainGDP = fullEurData[8]["value"].iat[-1]
+        spainExports = fullEurData[9]["value"].iat[-1]
+        netherlandsGDP = fullEurData[10]["value"].iat[-1]
+        netherlandsExports = fullEurData[11]["value"].iat[-1]
 
-        eurExports = ukExports + franceExports
-        eurGDP = ukGDP + franceGDP
+        oldEurExports = ukExports + franceExports
+        oldEurGDP = ukGDP + franceGDP
+        eurExports = ukExports + franceExports + swedenExports + greeceExports + luxExports + spainExports + netherlandsExports
+        eurGDP = ukGDP + franceGDP + swedenGDP + greeceGDP + luxGDP + spainGDP + netherlandsGDP
 
         eurData = {
             "exports": eurExports,
@@ -235,8 +243,6 @@ class marketData(object):
             for r in InstrumentsCandlesFactory(instrument=instrument,params=params):
                 rv = client.request(r);
                 newCandles.extend(rv["candles"])
-            print("newStartDate: " + startTimeString)
-            print("newEndDate: " + endTimeString)
             daysToAdd = 7 - (self.dayInterval%7)
             toMinus = 2 + daysToAdd
             for i in range(daysToAdd):
@@ -254,7 +260,7 @@ class marketData(object):
                 break;
             else:
                 print("running again");
-                self.date = getRandomDate();
+                self.date = getRandomDate(self.dayInterval);
 
         return {
             "secondData": [{
@@ -271,7 +277,6 @@ class marketData(object):
         if int(date) <= 0:
             date = str(12 - (2 - (int(date)+2)))
             year = int(dateString[:4])
-            print(year)
             year -= 1
             dateString = str(year) + dateString[4:]
         if int(date) < 10:
@@ -327,10 +332,8 @@ class trainingMarketAPI(object):
         cls.weekExtremesInit = marketDataObject.weekExtremes
         cls.fundamentalData = marketDataObject.fundamentalData
         cls.supportandResistanceInit = cls.calculateSupportandResistance()
-        print("SR: " + str(cls.supportandResistanceInit))
         cls.SRTouchesInit = (0,(0,0,0),(0,0,0))
         cls.SRStrengthsInit = (0,(0,0,0),(0,0,0))
-        print("dataset_length: " + str(len(marketDataObject.marketData["secondData"])))
         secondDataArray = cls.getSecondDataArray()
         cls.dayExtremesInit = cls.initDailyExtremes(secondDataArray, cls.secondStart)
         cls.emaData = trainingMarketAPI.ExpMovingAverage(secondDataArray, cls.EMAWindow);
@@ -339,10 +342,6 @@ class trainingMarketAPI(object):
         dm = cls.getDM(hl)
         diDifArray, cls.pdiData,cls.ndiData = trainingMarketAPI.getDI(dm,cls.atrData, cls.EMAWindow)
         cls.adxData = trainingMarketAPI.getADX(diDifArray, cls.pdiData, cls.ndiData, cls.EMAWindow)
-
-        for point in cls.marketData["dailyData"]:
-            print(point)
-        print()
 
     @classmethod
     def initSRTouches(cls,price):
@@ -362,7 +361,6 @@ class trainingMarketAPI(object):
     def calculateSupportandResistance(cls, close = 0, high = 0, low = 0):
         if close == 0:
             day = cls.marketData["dailyData"][-1]
-            print("day: " + str(day))
             high = float(day["mid"]["h"])
             low = float(day["mid"]["l"])
             close = float(day["mid"]["c"])
@@ -419,8 +417,10 @@ class trainingMarketAPI(object):
             toReturn = self.normalizeInverseLogit(value)
         elif type == "0toinf":
             toReturn = self.normalizeInverseLogitAfterLog(value)
-        elif type == "fundamentals":
-            toReturn = value / 1000000
+        elif type == "exports":
+            toReturn = value / 50000
+        elif type == "gdp":
+            toReturn = -( (value - 17000000) / 2000000)
         elif type == "none":
             toReturn = value
         else:
@@ -528,6 +528,7 @@ class trainingMarketAPI(object):
                 counter += 1
         return (pdmarray,ndmarray)
 
+    @staticmethod
     def getDI(dm, atr, window):
         pdm,ndm = dm
         pdmEMA = trainingMarketAPI.ExpMovingAverage(pdm,int(window/12))
@@ -662,6 +663,11 @@ class trainingMarketAPI(object):
         self.supportandResistance = self.supportandResistanceInit
         self.SRStrengths = self.SRStrengthsInit
         self.SRTouches = self.SRTouchesInit
+        self.totalProfit = 0
+        self.totalLoss = 0
+        self.maxEquity = 0
+        self.minEquity = 1000000
+        self.maxDrawdown = 0
         self.counters = {
             "second": self.secondStart,
             "monthly": 0,
@@ -761,6 +767,13 @@ class trainingMarketAPI(object):
         exportsDif = usaExports - eurExports
         return (gdpDif, exportsDif)
 
+    def checkFundamentalData(self, time):
+        if time[11:] == "00T00:00:00.000000000Z" :
+            month = time[5:7]
+            if month == "04" or month == "07" or month == "09" or month == "01":
+                useTime = time[:11] + "05T00:00:00.000000000Z"
+                self.fundamentalData = marketData.getFundamentalAnalysisData((useTime, idx))
+
 
     def getInputData(self):
         inputData = [];
@@ -768,6 +781,8 @@ class trainingMarketAPI(object):
         dayCounter = self.counters["daily"];
         weekCounter = self.counters["weekly"];
         monthCounter = self.counters["monthly"];
+
+        #self.checkFundamentalData(self.marketData["secondData"][secondCounter]["time"])
 
         secondOpen = float(self.marketData["secondData"][secondCounter]["o"]);
         secondClose = secondOpen - (self.spread * .00001);
@@ -820,8 +835,8 @@ class trainingMarketAPI(object):
 
 
         gdp, exports = self.calculateFundamentals(secondOpen)
-        inputData.append(self.normalize(gdp, "fundamentals"))
-        inputData.append(self.normalize(exports, "fundamentals"))
+        inputData.append(self.normalize(gdp, "gdp"))
+        inputData.append(self.normalize(exports, "exports"))
 
         lastOpen = float(self.marketData["secondData"][secondCounter-1]["o"]);
         if self.counters["second"] == 0:
@@ -888,6 +903,17 @@ class trainingMarketAPI(object):
             self.failed = True;
             self.started = False;
 
+        if self.equity < self.minEquity:
+            self.minEquity = self.equity
+        if self.equity > self.maxEquity:
+            self.maxEquity = self.equity
+            drawdown = ((self.maxEquity - self.minEquity) / self.maxEquity)
+            if drawdown > self.maxDrawdown:
+                self.maxDrawdown = drawdown
+            self.minEquity = 1000000 #important to note here that min equity is
+            #not minimum equity over the entire run, just the lowest point in the
+            #current trough
+
     def openPosition(self):
         self.positions.append(float(self.marketData["secondData"][self.counters["second"]-1]["o"]));
         #print("Opening a position");
@@ -898,12 +924,17 @@ class trainingMarketAPI(object):
             curPrice = float(self.marketData["secondData"][self.counters["second"]-1]["o"]) - (self.spread * .00001);
             self.balance -= entryPrice * self.posVolume;
             self.balance += curPrice * self.posVolume;
+            changeInMoney = (curPrice * self.posVolume) - (entryPrice* self.posVolume)
+            if (changeInMoney > 0):
+                self.totalProfit += changeInMoney
+            elif(changeInMoney < 0):
+                self.totalLoss += abs(changeInMoney)
 
     def getFitness(self):
         if self.failed:
             fitness = -self.startingBalance;
         elif self.lastAction == 0:
-            fitness = -10;
+            fitness = -100;
         else:
             fitness = self.getBalance() - (self.startingBalance * self.leverage);
         return fitness;
@@ -913,7 +944,10 @@ class trainingMarketAPI(object):
             "fitness": self.getFitness(),
             "balance": self.getBalance(),
             "equity": self.getEquity(),
-            "failed": self.failed
+            "failed": self.failed,
+            "totalProfit": self.totalProfit,
+            "totalLoss": self.totalLoss,
+            "max_drawdown": self.maxDrawdown
         };
         return results;
 

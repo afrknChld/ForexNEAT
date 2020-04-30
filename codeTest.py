@@ -15,10 +15,15 @@ import pandas
 
 def updateTest():
     sendUpdateToServer({
-        "data1": 5,
-        "data2": 19,
-        "data3": 100000,
-        "data4": "bruh"
+        "average_money_made": 1000.3,
+        "top_money_made": 100000.55539,
+        "gen": 0,
+        "num_snakes_trained": 1000,
+        "positive_money_count": 70,
+        "failed_count": 34,
+        "average_fitness": 2476.5,
+        "top_fitness": 10753.66,
+        "gen_size": "1000"
     })
 
 def sendToTestingFacilityTest():
@@ -34,15 +39,27 @@ def getEuroFundamentals():
     ukExports = fetch_series('Eurostat/namq_10_exi/Q.CLV05_MEUR.NSA.P6.UK')
     franceGDP = fetch_series('Eurostat/namq_10_gdp/Q.CLV05_MEUR.NSA.B1GQ.FR')
     franceExports = fetch_series('Eurostat/namq_10_exi/Q.CLV05_MEUR.NSA.P6.FR')
-    ukGDP = ukGDP.query("period >= '2010'")
-    ukExports = ukExports.query("period >= '2010'")
-    franceGDP = franceGDP.query("period >= '2010'")
-    franceExports = franceExports.query("period >= '2010'")
-    toSave = (ukGDP, ukExports, franceGDP, franceExports)
+    swedenGDP = fetch_series('Eurostat/namq_10_gdp/Q.CLV05_MEUR.NSA.B1GQ.SE')
+    swedenExports = fetch_series('Eurostat/namq_10_exi/Q.CLV05_MEUR.NSA.P6.SE')
+    greeceGDP = fetch_series('Eurostat/namq_10_gdp/Q.CLV05_MEUR.NSA.B1GQ.EL')
+    greeceExports = fetch_series('Eurostat/namq_10_exi/Q.CLV05_MEUR.NSA.P6.EL')
+    luxGDP = fetch_series('Eurostat/namq_10_gdp/Q.CLV05_MEUR.NSA.B1GQ.LU')
+    luxExports = fetch_series('Eurostat/namq_10_exi/Q.CLV05_MEUR.NSA.P6.LU')
+    spainGDP = fetch_series('Eurostat/namq_10_gdp/Q.CLV05_MEUR.NSA.B1GQ.ES')
+    spainExports = fetch_series('Eurostat/namq_10_exi/Q.CLV05_MEUR.NSA.P6.ES')
+    netherlandsGDP = fetch_series('Eurostat/namq_10_gdp/Q.CLV05_MEUR.NSA.B1GQ.NL')
+    netherlandsExports = fetch_series('Eurostat/namq_10_exi/Q.CLV05_MEUR.NSA.P6.NL')
+
+
+    toSave = (ukGDP, ukExports, franceGDP, franceExports, swedenGDP, swedenExports,
+        greeceGDP,greeceExports, luxGDP, luxExports, spainGDP, spainExports, netherlandsGDP, netherlandsExports)
+
     for ukGDP in toSave:
         #yes it's bad form to name my variables this way, but I first
         #had to test to see if this would work for one dataFrame before making
         #a for loop and I didn't wanna go and change every single name
+        ukGDP.query("period >= '2010'", inplace = True)
+        print("running")
         ukGDP.drop('National accounts indicator (ESA 2010)', axis = 1, inplace = True)
         ukGDP.drop('Geopolitical entity (reporting)', axis = 1, inplace = True)
         ukGDP.drop('Seasonal adjustment', axis = 1, inplace = True)
@@ -120,7 +137,7 @@ def maxTest():
     print(max(1,1));
 
 def main():
-    sendToTestingFacilityTest()
+    updateTest()
 
 
 if __name__ == "__main__":

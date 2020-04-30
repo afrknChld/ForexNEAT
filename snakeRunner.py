@@ -39,18 +39,12 @@ class snakeNN(object):
         self.neural_network = neat.nn.FeedForwardNetwork.create(genome, config)
         self.id = id
         self.results = None;
-        self.marketAPI = None;
         self.lastAction = 2
 
     def runNN(self,input):
         output = self.neural_network.activate(input)
         output = [ (1/(1 + np.exp(-i))) for i in output ]
-        toReturn = 2
-        if output[0] > .5 and output[1] < .5:
-            toReturn = 0
-        elif output[1] > .5 and output[0] < .5:
-            toReturn = 1
-        return toReturn;
+        return output.index(max(output));
 
     def test(self):
         #runs the NN in a test environment for the purpose of evaluating
@@ -71,6 +65,8 @@ class snakeNN(object):
                 if self.lastAction != 1:
                     self.lastAction = 1;
                     marketAPI.closePosition();
+            elif output == 2:
+                self.lastAction = 2
 
 
         self.results = marketAPI.getResults();

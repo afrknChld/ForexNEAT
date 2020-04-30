@@ -1,6 +1,7 @@
 import neat
 import pickle
 import sys
+import os
 import json
 import time
 import gzip
@@ -56,16 +57,18 @@ def sendUpdateToServer(info):
     r = requests.post(updateURL, data = data)
 
 def sendToTestingFacility(info, filename):
-    url = "https://forexnntracker.herokuapp.com/trainingfactorysnakes"
-    pickle.dump(info, open(filename, "wb"))
+    exIP = "ec2-3-23-59-116.us-east-2.compute.amazonaws.com"
+    user = "ec2-user"
+    pickle.dump(info, open(filename,"wb"))
     files = {"file": open(filename,"rb")}
     ssh = SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     key = paramiko.RSAKey.from_private_key_file("/home/cole/.ssh/id_rsa")
-    ssh.connect("ec2-3-16-37-109.us-east-2.compute.amazonaws.com", pkey = key, username = "ec2-user")
+    ssh.connect(exIP, pkey = key, username = user)
     scp = SCPClient(ssh.get_transport())
     scp.put(filename, remote_path = "/home/ec2-user/forexNEAT-testing-factory/toTestingFactory")
     scp.close()
+    os.remove(filename)
 
 
 # Driver for NEAT solution to FlapPyBird
@@ -109,7 +112,13 @@ def evolutionary_driver(n=0,load = False, loadfile = "", save = False, savefile 
     if n == 0:
         n = None
 
-    winner = p.run(eval_genomes, n=n)
+    run_loop2 = True
+    while(run_loop2):
+        try:
+            winner = p.run(eval_genomes, n=n)
+            run_loop2 = False
+        except Exception as e:
+            print(e)
 
     winnerID = readFromGenFile()["winnerID"];
 
@@ -137,28 +146,50 @@ def eval_genomes(genomes, config):
     idx,genomes = zip(*genomes)
 
     runner = snakeRunner(genomes, config, gen, curID);
-    runner.run(True)
-    results = runner.getResults()
+    run_loop = True
+    while(run_loop):
+        try:
+            runner.run(True)
+            results = runner.getResults()
+            run_loop = False
+        except Exception as e:
+            print(e)
 
     top_fitness = 0
     failed_count = 0
     fitness_total = 0
-    runner_up_fitness = [0,0]
-    winners = [None,None,None]
-    positive_fitness_count = 0
+    money_made_total = 0
+    top_money_made = 0
+    runner_up_fitness = [0,0,0,0]
+    winners = [None,None,None,None,None]
+    positive_money_count = 0
     for result, genomes in results:
-        fitness = result["fitness"];
+        money_made = result["fitness"];
         balance = result["balance"];
         equity = result["equity"];
         failed = result["failed"];
         id = result["id"];
+        totalLoss = result["totalLoss"]
+        totalProfit = result["totalProfit"]
+        max_drawdown = result["max_drawdown"]
+        balance_equity_disparity = equity-balance
+
+        fitness = money_made - ( -balance_equity_disparity / 10) - (totalLoss / 10) - max_drawdown * 100
+        if failed:
+            failed_count += 1
+            fitness = -1000
+
         genomes.fitness = fitness
 
         #print("fitness for NN of id "+ str(id) +" is: " + str(fitness));
         fitness_total += fitness
 
-        if fitness > 0:
-            positive_fitness_count += 1
+        money_made_total += money_made
+
+        if money_made > 0:
+            positive_money_count += 1
+        if money_made > top_money_made:
+            top_money_made = money_made
 
         if fitness > top_fitness:
             top_fitness = fitness
@@ -182,14 +213,25 @@ def eval_genomes(genomes, config):
                     "id": id,
                     "genome": genomes,
                 }
-
-
-        if failed:
-            failed_count+=1
+        elif fitness > runner_up_fitness[2]:
+            runner_up_fitness[2] = fitness
+            if fitness > 0 :
+                winners[3] = {
+                    "id": id,
+                    "genome": genomes,
+                }
+        elif fitness > runner_up_fitness[3]:
+            runner_up_fitness[3] = fitness
+            if fitness > 0 :
+                winners[4] = {
+                    "id": id,
+                    "genome": genomes,
+                }
 
         curID = id
 
     average_fitness = fitness_total / len(results)
+    average_money_made = money_made / len(results)
     print("The top fitness for this generation is: " + str(top_fitness))
 
     gen+=1
@@ -205,12 +247,14 @@ def eval_genomes(genomes, config):
     }, "toTestingFacility" + str(gen) + ".pkl")
 
     sendUpdateToServer({
-        "top_fitness": top_fitness,
+        "average_money_made": average_money_made,
+        "top_money_made": top_money_made,
         "gen": gen-1,
         "num_snakes_trained": curID,
-        "positive_fitness_count": positive_fitness_count,
+        "positive_money_count": positive_money_count,
         "failed_count": failed_count,
         "average_fitness": average_fitness,
+        "top_fitness": top_fitness,
         "gen_size": len(results)
     })
 
