@@ -174,7 +174,7 @@ def eval_genomes(genomes, config):
         max_drawdown = result["max_drawdown"]
         balance_equity_disparity = equity-balance
 
-        fitness = money_made - ( -balance_equity_disparity / 10) - (totalLoss / 10) - max_drawdown * 100
+        fitness = money_made + (balance_equity_disparity / 30) - (totalLoss / 10) - max_drawdown * 100
         if failed:
             failed_count += 1
             fitness = -1000
