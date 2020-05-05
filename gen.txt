@@ -1,7 +1,7 @@
 0
+1
+6
+None
+pop.pkl
+5999
 0
-8
-None
-None
-8002
-7194

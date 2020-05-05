@@ -21,6 +21,13 @@ class populationSave(object):
         self.curID = curID
         self.rndstate = random.getState()
 
+def writeErrorLog(e):
+    URL = "https://forexnntracker.herokuapp.com/errorlog"
+    data = {"error": str(e)}
+    r = requests.post(URL, data = data)
+
+
+
 def readFromGenFile():
     genFile = open("gen.txt","r")
     toReturn = {
@@ -60,7 +67,6 @@ def sendToTestingFacility(info, filename):
     exIP = "ec2-3-23-59-116.us-east-2.compute.amazonaws.com"
     user = "ec2-user"
     pickle.dump(info, open(filename,"wb"))
-    files = {"file": open(filename,"rb")}
     ssh = SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     key = paramiko.RSAKey.from_private_key_file("/home/cole/.ssh/id_rsa")
@@ -68,7 +74,8 @@ def sendToTestingFacility(info, filename):
     scp = SCPClient(ssh.get_transport())
     scp.put(filename, remote_path = "/home/ec2-user/forexNEAT-testing-factory/toTestingFactory")
     scp.close()
-    os.remove(filename)
+    print("removing: " + str(filename))
+    os.remove("/home/cole/forex/" + str(filename))
 
 
 # Driver for NEAT solution to FlapPyBird
@@ -119,6 +126,7 @@ def evolutionary_driver(n=0,load = False, loadfile = "", save = False, savefile 
             run_loop2 = False
         except Exception as e:
             print(e)
+            writeErrorLog(e)
 
     winnerID = readFromGenFile()["winnerID"];
 
@@ -154,6 +162,7 @@ def eval_genomes(genomes, config):
             run_loop = False
         except Exception as e:
             print(e)
+            writeErrorLog(e)
 
     top_fitness = 0
     failed_count = 0
@@ -174,10 +183,10 @@ def eval_genomes(genomes, config):
         max_drawdown = result["max_drawdown"]
         balance_equity_disparity = equity-balance
 
-        fitness = money_made + (balance_equity_disparity / 30) - (totalLoss / 10) - max_drawdown * 100
+        fitness = money_made + (balance_equity_disparity * .1) - (totalLoss * .1) - (max_drawdown * 100)
         if failed:
             failed_count += 1
-            fitness = -1000
+            fitness = -2000
 
         genomes.fitness = fitness
 
@@ -241,6 +250,8 @@ def eval_genomes(genomes, config):
         if winner == None:
             winners.remove(winner)
 
+
+
     sendToTestingFacility({
         "config": config,
         "winners": winners
@@ -255,10 +266,8 @@ def eval_genomes(genomes, config):
         "failed_count": failed_count,
         "average_fitness": average_fitness,
         "top_fitness": top_fitness,
-        "gen_size": len(results)
+        "gen_size": len(results),
     })
-
-
 
 
 

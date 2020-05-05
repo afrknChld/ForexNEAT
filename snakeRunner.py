@@ -43,7 +43,9 @@ class snakeNN(object):
 
     def runNN(self,input):
         output = self.neural_network.activate(input)
-        output = [ (1/(1 + np.exp(-i))) for i in output ]
+        print(output)
+        output = [ (1/(1 + np.exp(-np.round(i,decimals = 10)))) for i in output ]
+        if 
         return output.index(max(output));
 
     def test(self):
