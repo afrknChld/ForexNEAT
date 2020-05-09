@@ -137,7 +137,7 @@ def maxTest():
     print(max(1,1));
 
 def main():
-    testRun()
+    sendToTestingFacilityTest()
 
 
 if __name__ == "__main__":
