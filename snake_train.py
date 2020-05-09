@@ -72,7 +72,7 @@ def sendToTestingFacility(info, filename):
     key = paramiko.RSAKey.from_private_key_file("/home/clashley/.ssh/id_rsa")
     ssh.connect(exIP, pkey = key, username = user)
     scp = SCPClient(ssh.get_transport())
-    scp.put(filename, remote_path = "/home/clashley/forexNEAT-testing-factory/toTestingFactory")
+    scp.put(filename, remote_path = "/home/clashley/toTestingFactory")
     scp.close()
     print("removing: " + str(filename))
     os.remove("/home/cole/forex/" + str(filename))
