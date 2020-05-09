@@ -64,15 +64,15 @@ def sendUpdateToServer(info):
     r = requests.post(updateURL, data = data)
 
 def sendToTestingFacility(info, filename):
-    exIP = "ec2-3-23-59-116.us-east-2.compute.amazonaws.com"
-    user = "ec2-user"
+    exIP = "35.223.42.115"
+    user = "clashley"
     pickle.dump(info, open(filename,"wb"))
     ssh = SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     key = paramiko.RSAKey.from_private_key_file("/home/cole/.ssh/id_rsa")
     ssh.connect(exIP, pkey = key, username = user)
     scp = SCPClient(ssh.get_transport())
-    scp.put(filename, remote_path = "/home/ec2-user/forexNEAT-testing-factory/toTestingFactory")
+    scp.put(filename, remote_path = "/home/clashley/forexNEAT-testing-factory/toTestingFactory")
     scp.close()
     print("removing: " + str(filename))
     os.remove("/home/cole/forex/" + str(filename))
