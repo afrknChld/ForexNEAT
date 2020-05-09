@@ -69,7 +69,7 @@ def sendToTestingFacility(info, filename):
     pickle.dump(info, open(filename,"wb"))
     ssh = SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    key = paramiko.RSAKey.from_private_key_file("/home/cole/.ssh/id_rsa")
+    key = paramiko.RSAKey.from_private_key_file("/home/clashley/.ssh/id_rsa")
     ssh.connect(exIP, pkey = key, username = user)
     scp = SCPClient(ssh.get_transport())
     scp.put(filename, remote_path = "/home/clashley/forexNEAT-testing-factory/toTestingFactory")
