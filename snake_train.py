@@ -98,8 +98,7 @@ def evolutionary_driver(n=0,load = False, loadfile = "", save = False, savefile 
         p.add_reporter(neat.StdOutReporter(False))
         if save:
             p.add_reporter(neat.Checkpointer(generation_interval = 5,
-                                        filename_prefix = savefile,
-                                        test_check = 0));
+                                        filename_prefix = savefile));
         gen = 0;
         curID = 0;
 
