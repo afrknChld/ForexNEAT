@@ -8,6 +8,7 @@ import gzip
 import random
 import requests
 import paramiko
+import traceback
 from paramiko import SSHClient
 from scp import SCPClient
 from snakeRunner import snakeRunner, snakeNN
@@ -69,13 +70,13 @@ def sendToTestingFacility(info, filename):
     pickle.dump(info, open(filename,"wb"))
     ssh = SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    key = paramiko.RSAKey.from_private_key_file("/home/clashley/.ssh/id_rsa")
+    key = paramiko.RSAKey.from_private_key_file("/home/jethro/.ssh/id_rsa")
     ssh.connect(exIP, pkey = key, username = user)
     scp = SCPClient(ssh.get_transport())
     scp.put(filename, remote_path = "/home/clashley/toTestingFactory")
     scp.close()
     print("removing: " + str(filename))
-    os.remove("/home/cole/forex/" + str(filename))
+    os.remove("/home/jethro/forex/" + str(filename))
 
 
 # Driver for NEAT solution to FlapPyBird
@@ -161,7 +162,7 @@ def eval_genomes(genomes, config):
             results = runner.getResults()
             run_loop = False
         except Exception as e:
-            print(e)
+            traceback.print_exc()
             writeErrorLog(e)
 
     top_fitness = 0
