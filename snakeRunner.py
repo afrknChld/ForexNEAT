@@ -1,5 +1,6 @@
 from marketAPI import trainingMarketAPI, liveMarketAPI, initMarketData
 from multiprocessing import Process, Pool, Manager
+from numba import jit, cuda
 import neat
 import time
 import random
