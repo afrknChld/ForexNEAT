@@ -76,7 +76,7 @@ def sendToTestingFacility(info, filename):
     scp.put(filename, remote_path = "/home/clashley/toTestingFactory")
     scp.close()
     print("removing: " + str(filename))
-    os.remove("/home/jethro/forex/" + str(filename))
+    os.remove("/home/jethro/ForexNEAT/" + str(filename))
 
 
 # Driver for NEAT solution to FlapPyBird
